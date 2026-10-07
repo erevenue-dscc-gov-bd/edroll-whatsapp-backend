@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Edroll WhatsApp Hub — Backend Console</title>
+<style>
+  :root {
+    --bg: #0b141a;
+    --panel: #111b21;
+    --panel-2: #1b2429;
+    --line: #222d34;
+    --text: #e9edef;
+    --muted: #8696a0;
+    --green: #25d366;
+    --green-dark: #00a884;
+    --amber: #ffb02e;
+    --red: #f15c6d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .logo {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--green-dark); font-size: 18px;
+  }
+  h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  main { max-width: 1000px; margin: 0 auto; padding: 22px; display: grid; gap: 18px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+  }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .ok .dot { background: var(--green); }
+  .warn .dot { background: var(--amber); }
+  .bad .dot { background: var(--red); }
+  .meta { color: var(--muted); font-size: 12.5px; margin-top: 8px; word-break: break-word; }
+  form { display: grid; gap: 10px; grid-template-columns: 1fr 2fr auto; align-items: end; }
+  label { display: grid; gap: 6px; font-size: 12.5px; color: var(--muted); }
+  input {
+    width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit;
+  }
+  input:focus { outline: 2px solid var(--green-dark); outline-offset: 1px; }
+  button {
+    padding: 11px 18px; border: 0; border-radius: 9px; background: var(--green-dark); color: #04150f;
+    font: inherit; font-weight: 700; cursor: pointer;
+  }
+  button:hover { background: var(--green); }
+  button:disabled { opacity: .55; cursor: progress; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
+  pre {
+    margin: 0; background: #0a1015; border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; overflow: auto; max-height: 320px; font-size: 12.5px; line-height: 1.55;
+    color: #c8d3d8; white-space: pre-wrap; word-break: break-word;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .row h2 { margin: 0; }
+  .hint { color: var(--muted); font-size: 12.5px; }
+  @media (max-width: 640px) { form { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">💬</div>
+  <div>
+    <h1>Edroll WhatsApp Hub — Backend Console</h1>
+    <p>Live status and endpoint tester. Credentials stay server-side and are never sent to this page.</p>
+  </div>
+</header>
+
+<main>
+  <section class="grid">
+    <div class="card"><h2>Service</h2><div id="s-health" class="badge"><span class="dot"></span><span>checking…</span></div><div class="meta" id="m-health"></div></div>
+    <div class="card"><h2>Meta config</h2><div id="s-config" class="badge"><span class="dot"></span><span>checking…</span></div><div class="meta" id="m-config"></div></div>
+    <div class="card"><h2>Database</h2><div id="s-db" class="badge"><span class="dot"></span><span>checking…</span></div><div class="meta" id="m-db"></div></div>
+    <div class="card"><h2>Webhook</h2><div id="s-hook" class="badge"><span class="dot"></span><span>checking…</span></div><div class="meta" id="m-hook"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <h2>Send a WhatsApp message</h2>
+      <button class="ghost" type="button" id="refresh">Refresh status</button>
+    </div>
+    <form id="send-form">
+      <label>Recipient (E.164, no +)
+        <input name="to" placeholder="8801XXXXXXXXX" autocomplete="off" required />
+      </label>
+      <label>Message text
+        <input name="text" placeholder="Hello from Edroll" autocomplete="off" required />
+      </label>
+      <button type="submit" id="send-btn">Send</button>
+    </form>
+    <p class="hint" id="send-hint">POST /api/messages/send — proxied to Meta Graph API by the server.</p>
+  </section>
+
+  <section class="card">
+    <h2>Response</h2>
+    <pre id="out">Ready.</pre>
+  </section>
+</main>
+
+<script>
+  const base = location.origin;
+  const out = document.getElementById('out');
+
+  const print = (label, data) => {
+    const stamp = new Date().toLocaleTimeString();
+    out.textContent = `[${stamp}] ${label}\n` + JSON.stringify(data, null, 2);
+  };
+
+  const setBadge = (id, metaId, state, label, meta) => {
+    const el = document.getElementById(id);
+    el.className = `badge ${state}`;
+    el.querySelector('span:last-child').textContent = label;
+    document.getElementById(metaId).textContent = meta || '';
+  };
+
+  const getJSON = async (path) => {
+    const res = await fetch(base + path);
+    return { status: res.status, body: await res.json().catch(() => ({})) };
+  };
+
+  async function refresh() {
+    try {
+      const health = await getJSON('/api/health');
+      setBadge('s-health', 'm-health', health.body.ok ? 'ok' : 'bad',
+        health.body.ok ? 'Running' : 'Down', `uptime ${health.body.uptimeSeconds ?? '?'}s`);
+
+      const cfg = await getJSON('/api/config');
+      const b = cfg.body;
+      const metaReady = b.phoneNumberConfigured && b.accessTokenConfigured;
+      setBadge('s-config', 'm-config', metaReady ? 'ok' : 'warn',
+        metaReady ? 'Credentials set' : 'Not configured',
+        `graph ${b.metaGraphVersion} · phone ${b.phoneNumberConfigured ? '✓' : '✗'} · token ${b.accessTokenConfigured ? '✓' : '✗'}`);
+
+      const db = await getJSON('/api/health/db');
+      setBadge('s-db', 'm-db', db.body.connected ? 'ok' : 'warn',
+        db.body.connected ? 'Connected' : 'Not configured', db.body.mode || '');
+
+      const hook = await getJSON('/api/webhook/status');
+      setBadge('s-hook', 'm-hook', hook.body.configured ? 'ok' : 'warn',
+        hook.body.configured ? 'Configured' : 'Placeholder', hook.body.note || '');
+
+      print('GET /api/health, /api/config, /api/health/db, /api/webhook/status',
+        { health: health.body, config: cfg.body, db: db.body, webhook: hook.body });
+    } catch (err) {
+      print('Status check failed', { error: err.message });
+    }
+  }
+
+  document.getElementById('refresh').addEventListener('click', refresh);
+
+  document.getElementById('send-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true;
+    try {
+      const res = await fetch(base + '/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: form.get('to').trim(), text: form.get('text').trim() })
+      });
+      print(`POST /api/messages/send → HTTP ${res.status}`, await res.json().catch(() => ({})));
+    } catch (err) {
+      print('POST /api/messages/send failed', { error: err.message });
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  refresh();
+</script>
+</body>
+</html>

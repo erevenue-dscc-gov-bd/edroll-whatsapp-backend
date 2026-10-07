@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit real Meta credentials
+.env
+.env.*
+!.env.example
+
+# Logs and local noise
+*.log
+npm-debug.log*
+.DS_Store
