@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Edroll WhatsApp Hub</title>
+<style>
+  :root {
+    --bg: #0b141a; --panel: #111b21; --panel-2: #202c33; --panel-3: #2a3942;
+    --line: #222d34; --text: #e9edef; --muted: #8696a0;
+    --green: #25d366; --green-dark: #00a884; --in-bubble: #202c33; --out-bubble: #005c4b;
+    --amber: #ffb02e; --red: #f15c6d; --blue: #53bdeb;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); overflow: hidden;
+    font: 14.5px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #374248; border-radius: 4px; }
+
+  #app { display: grid; grid-template-columns: 320px 1fr 330px; height: 100vh; }
+
+  /* --- sidebar --- */
+  aside { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+  .brand { padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px; }
+  .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: var(--green-dark); display: grid; place-items: center; font-size: 17px; }
+  .brand h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .brand p { margin: 0; font-size: 11.5px; color: var(--muted); }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; }
+  .pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .pill.ok .dot { background: var(--green); } .pill.warn .dot { background: var(--amber); } .pill.bad .dot { background: var(--red); }
+  .search { padding: 0 12px 10px; display: flex; gap: 8px; }
+  .search input { flex: 1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; min-width: 0; }
+  .search select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .conv-list { flex: 1; overflow-y: auto; }
+  .conv { display: block; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 11px 14px; cursor: pointer; }
+  .conv:hover { background: var(--panel-2); }
+  .conv.active { background: var(--panel-3); }
+  .conv .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .conv .name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conv .time { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .conv .bottom { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-top: 3px; }
+  .conv .num { font-size: 11.5px; color: var(--muted); }
+  .conv .tags { display: flex; gap: 5px; flex-shrink: 0; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-3); color: var(--muted); }
+  .tag.wait { background: rgba(255,176,46,.15); border-color: rgba(255,176,46,.4); color: var(--amber); }
+  .tag.closed { background: rgba(134,150,160,.15); }
+  .empty { padding: 24px 16px; color: var(--muted); font-size: 13px; text-align: center; }
+
+  /* --- thread --- */
+  main { display: flex; flex-direction: column; min-width: 0; background: #0c1317; }
+  .thread-head { display: flex; align-items: center; gap: 12px; padding: 12px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--panel-3); display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--green); flex-shrink: 0; }
+  .thread-head .who { min-width: 0; }
+  .thread-head .who b { display: block; font-size: 14.5px; }
+  .thread-head .who span { font-size: 12px; color: var(--muted); }
+  .thread-head .actions { margin-left: auto; display: flex; gap: 8px; }
+  .btn { background: var(--panel-3); border: 1px solid var(--line); border-radius: 8px; padding: 7px 13px; cursor: pointer; font-size: 13px; }
+  .btn:hover { background: #33454f; }
+  .btn.primary { background: var(--green-dark); border-color: transparent; color: #04150f; font-weight: 700; }
+  .btn.primary:hover { background: var(--green); }
+  .btn.tiny { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .thread { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+  .day { align-self: center; background: var(--panel-2); color: var(--muted); font-size: 11.5px; padding: 4px 12px; border-radius: 999px; margin: 8px 0; }
+  .bubble { max-width: min(560px, 78%); padding: 8px 11px 6px; border-radius: 10px; background: var(--in-bubble); align-self: flex-start; box-shadow: 0 1px 1px rgba(0,0,0,.25); }
+  .bubble.out { background: var(--out-bubble); align-self: flex-end; }
+  .bubble.failed { background: #4a1f26; }
+  .bubble p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  .bubble .meta { display: flex; justify-content: flex-end; gap: 6px; align-items: center; font-size: 10.5px; color: rgba(233,237,239,.6); margin-top: 4px; }
+  .tick.read { color: var(--blue); }
+  .tick.failed { color: var(--red); }
+
+  .composer { display: flex; gap: 10px; padding: 12px 16px; background: var(--panel); border-top: 1px solid var(--line); align-items: flex-end; }
+  .composer textarea { flex: 1; resize: none; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; max-height: 120px; min-height: 42px; }
+  .composer textarea:focus, .search input:focus { outline: 2px solid var(--green-dark); outline-offset: 1px; }
+
+  /* --- right panel --- */
+  .side { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .card { background: var(--bg); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; }
+  .card h2 { margin: 0 0 10px; font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .stat { background: var(--panel-2); border-radius: 9px; padding: 9px 11px; }
+  .stat b { display: block; font-size: 19px; line-height: 1.25; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .chart { display: flex; align-items: flex-end; gap: 5px; height: 74px; margin-top: 4px; }
+  .chart .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%; }
+  .chart .bar { border-radius: 3px 3px 0 0; min-height: 2px; }
+  .chart .bar.in { background: var(--green-dark); }
+  .chart .bar.out { background: var(--blue); opacity: .8; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+  .events { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+  .event { font-size: 11.5px; border-left: 2px solid var(--panel-3); padding: 2px 0 2px 8px; color: var(--muted); }
+  .event b { color: var(--text); font-weight: 600; }
+  .sim { display: flex; flex-direction: column; gap: 8px; }
+  .sim input { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .row { display: flex; gap: 8px; }
+  .row .btn { flex: 1; }
+  .hint { font-size: 11px; color: var(--muted); margin: 0; }
+
+  @media (max-width: 1100px) { #app { grid-template-columns: 290px 1fr; } .side { display: none; } }
+  @media (max-width: 720px) { #app { grid-template-columns: 1fr; } aside { display: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <div class="brand">
+      <div class="logo">💬</div>
+      <div>
+        <h1>Edroll WhatsApp Hub</h1>
+        <p>Live conversation desk</p>
+      </div>
+    </div>
+    <div class="pills" id="pills"></div>
+    <div class="search">
+      <input id="q" placeholder="Search name or number" autocomplete="off" />
+      <select id="filter">
+        <option value="all">All</option>
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+      </select>
+    </div>
+    <div class="conv-list" id="conv-list"><div class="empty">Loading…</div></div>
+  </aside>
+
+  <main>
+    <div class="thread-head" id="thread-head" style="display:none">
+      <div class="avatar" id="avatar">–</div>
+      <div class="who"><b id="peer-name">–</b><span id="peer-meta">–</span></div>
+      <div class="actions">
+        <button class="btn tiny" id="toggle-status">Close</button>
+      </div>
+    </div>
+    <div class="thread" id="thread"><div class="empty">Select a conversation to see messages.<br />Or seed the demo data on the right.</div></div>
+    <div class="composer" id="composer" style="display:none">
+      <textarea id="text" rows="1" placeholder="Type a reply and press Enter…"></textarea>
+      <button class="btn primary" id="send">Send</button>
+    </div>
+  </main>
+
+  <div class="side">
+    <div class="card">
+      <h2>Metrics</h2>
+      <div class="stats" id="stats"><div class="stat"><b>–</b><span>loading</span></div></div>
+    </div>
+    <div class="card">
+      <h2>Message volume · 14 days</h2>
+      <div class="chart" id="chart"></div>
+      <div class="legend"><span><i style="background:var(--green-dark)"></i>Inbound</span><span><i style="background:var(--blue)"></i>Outbound</span></div>
+    </div>
+    <div class="card">
+      <h2>Simulator</h2>
+      <div class="sim">
+        <input id="sim-name" placeholder="Contact name (optional)" />
+        <input id="sim-from" placeholder="8801XXXXXXXXX" />
+        <input id="sim-text" placeholder="Inbound message text" />
+        <button class="btn" id="sim-send">Simulate inbound message</button>
+        <div class="row">
+          <button class="btn tiny" id="seed">Seed demo data</button>
+          <button class="btn tiny" id="reset">Reset data</button>
+        </div>
+        <p class="hint" id="sim-hint"></p>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Live events</h2>
+      <div class="events" id="events"><div class="event">waiting…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { conversations: [], activeId: null, thread: null, filter: 'all', search: '', config: null };
+const el = (id) => document.getElementById(id);
+const node = (tag, className, text) => { const n = document.createElement(tag); if (className) n.className = className; if (text != null) n.textContent = text; return n; };
+
+const timeAgo = (value) => {
+  if (!value) return '';
+  const seconds = Math.max(0, (Date.now() - new Date(value).getTime()) / 1000);
+  if (seconds < 60) return 'now';
+  if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+  if (seconds < 86400) return Math.floor(seconds / 3600) + 'h';
+  return Math.floor(seconds / 86400) + 'd';
+};
+const clock = (value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const dayLabel = (value) => new Date(value).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+
+function tickFor(message) {
+  const map = { sent: '✓', accepted: '✓', delivered: '✓✓', read: '✓✓', failed: '⚠' };
+  const tick = node('span', 'tick ' + message.status, map[message.status] || '•');
+  if (message.status === 'read') tick.classList.add('read');
+  return tick;
+}
+
+// --- sidebar ---
+function renderPills(health, cfg) {
+  const pills = el('pills');
+  pills.textContent = '';
+  const add = (label, status, title) => {
+    const pill = node('span', 'pill ' + status);
+    pill.appendChild(node('span', 'dot'));
+    pill.appendChild(node('span', null, label));
+    if (title) pill.title = title;
+    pills.appendChild(pill);
+  };
+  const db = health?.database || {};
+  add(`DB: ${db.mode || '?'}`, db.connected ? 'ok' : 'warn');
+  if (cfg) {
+    add(cfg.simulateMeta ? 'Meta: simulated' : 'Meta: live', cfg.simulateMeta ? 'warn' : 'ok',
+      cfg.simulateMeta ? 'No credentials — sends are stored locally, nothing leaves the server.' : 'Sending via graph.facebook.com');
+    add(cfg.webhookConfigured ? 'Webhook: ready' : 'Webhook: no token', cfg.webhookConfigured ? 'ok' : 'warn');
+  }
+  const sse = node('span', sseState === 'open' ? 'pill ok' : 'pill bad');
+  sse.appendChild(node('span', 'dot'));
+  sse.appendChild(node('span', null, sseState === 'open' ? 'Realtime: live' : 'Realtime: down'));
+  pills.appendChild(sse);
+}
+
+async function loadConversations() {
+  const params = new URLSearchParams({ status: state.filter, q: state.search });
+  const res = await fetch('/api/conversations?' + params);
+  state.conversations = (await res.json()).conversations || [];
+  renderConversations();
+}
+
+function renderConversations() {
+  const list = el('conv-list');
+  list.textContent = '';
+  if (!state.conversations.length) {
+    list.appendChild(node('div', 'empty', 'No conversations yet. Use “Seed demo data” or “Simulate inbound message”.'));
+    return;
+  }
+  for (const conv of state.conversations) {
+    const item = node('button', 'conv' + (conv.id === state.activeId ? ' active' : ''));
+    const top = node('div', 'top');
+    top.appendChild(node('span', 'name', conv.profile_name || conv.wa_id));
+    top.appendChild(node('span', 'time', timeAgo(conv.last_message_at)));
+
+    const bottom = node('div', 'bottom');
+    bottom.appendChild(node('span', 'num', conv.wa_id));
+    const tags = node('div', 'tags');
+    const awaiting = conv.status === 'open' && conv.last_message_direction === 'inbound';
+    tags.appendChild(node('span', 'tag' + (awaiting ? ' wait' : ''), awaiting ? 'awaiting reply' : 'replied'));
+    if (conv.status === 'closed') tags.appendChild(node('span', 'tag closed', 'closed'));
+    bottom.appendChild(tags);
+
+    item.appendChild(top);
+    item.appendChild(bottom);
+    item.addEventListener('click', () => openConversation(conv.id));
+    list.appendChild(item);
+  }
+}
+
+// --- thread ---
+async function openConversation(id) {
+  state.activeId = id;
+  const res = await fetch('/api/conversations/' + id);
+  if (!res.ok) return;
+  state.thread = await res.json();
+  renderConversations();
+  renderThread();
+}
+
+function renderThread() {
+  const head = el('thread-head');
+  const thread = el('thread');
+  if (!state.thread) return;
+  const { conversation, messages } = state.thread;
+  const contact = conversation;
+
+  head.style.display = 'flex';
+  el('composer').style.display = 'flex';
+  el('avatar').textContent = (contact.profile_name || contact.wa_id).slice(0, 1).toUpperCase();
+  el('peer-name').textContent = contact.profile_name || contact.wa_id;
+  const sla = conversation.first_response_seconds != null
+    ? ` · first response ${conversation.first_response_seconds}s`
+    : ' · no reply yet';
+  el('peer-meta').textContent = `${contact.wa_id} · ${conversation.status}${sla}`;
+  el('toggle-status').textContent = conversation.status === 'open' ? 'Close' : 'Reopen';
+
+  thread.textContent = '';
+  if (!messages.length) thread.appendChild(node('div', 'empty', 'No messages stored yet.'));
+  let lastDay = null;
+  for (const message of messages) {
+    const day = dayLabel(message.created_at);
+    if (day !== lastDay) { thread.appendChild(node('div', 'day', day)); lastDay = day; }
+
+    const bubble = node('div', 'bubble' + (message.direction === 'outbound' ? ' out' : '') + (message.status === 'failed' ? ' failed' : ''));
+    bubble.appendChild(node('p', null, message.body || `[${message.type}]`));
+    const meta = node('div', 'meta');
+    if (message.error) meta.title = message.error.message || JSON.stringify(message.error);
+    meta.appendChild(node('span', null, clock(message.created_at)));
+    if (message.direction === 'outbound') meta.appendChild(tickFor(message));
+    bubble.appendChild(meta);
+    thread.appendChild(bubble);
+  }
+  thread.scrollTop = thread.scrollHeight;
+}
+
+// --- metrics + events ---
+async function loadMetrics() {
+  const data = await (await fetch('/api/metrics')).json();
+  const stats = el('stats');
+  stats.textContent = '';
+  const m = data.messages || {};
+  const c = data.conversations || {};
+  const cards = [
+    [m.inbound ?? 0, 'inbound'],
+    [m.outbound ?? 0, 'outbound'],
+    [c.awaitingReply ?? 0, 'awaiting reply'],
+    [c.open ?? 0, 'open conversations'],
+    [c.avgFirstResponseSeconds != null ? c.avgFirstResponseSeconds + 's' : '–', `avg first response (${c.measuredResponses ?? 0})`],
+    [m.failed ? m.failed : data.contacts ?? 0, m.failed ? 'failed sends' : 'contacts']
+  ];
+  for (const [value, label] of cards) {
+    const stat = node('div', 'stat');
+    stat.appendChild(node('b', null, String(value)));
+    stat.appendChild(node('span', null, label));
+    stats.appendChild(stat);
+  }
+
+  const chart = el('chart');
+  chart.textContent = '';
+  const days = data.throughput || [];
+  const peak = Math.max(1, ...days.map((d) => Math.max(d.inbound, d.outbound)));
+  if (!days.length) chart.appendChild(node('div', 'hint', 'No messages in the last 14 days.'));
+  for (const day of days) {
+    const col = node('div', 'col');
+    col.title = `${day.day}: ${day.inbound} in / ${day.outbound} out`;
+    const out = node('div', 'bar out'); out.style.height = (day.outbound / peak * 100) + '%';
+    const inc = node('div', 'bar in'); inc.style.height = (day.inbound / peak * 100) + '%';
+    col.appendChild(out); col.appendChild(inc);
+    chart.appendChild(col);
+  }
+}
+
+async function loadEvents() {
+  const data = await (await fetch('/api/events?limit=40')).json();
+  renderEvents(data.events || []);
+}
+
+function renderEvents(events) {
+  const box = el('events');
+  box.textContent = '';
+  if (!events.length) { box.appendChild(node('div', 'event', 'No events yet.')); return; }
+  for (const event of events) {
+    const line = node('div', 'event');
+    line.appendChild(node('b', null, event.type));
+    line.appendChild(node('span', null, ' ' + new Date(event.at).toLocaleTimeString()));
+    const detail = Object.entries(event.detail || {})
+      .filter(([, v]) => v != null && v !== '')
+      .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join(' · ');
+    if (detail) line.appendChild(node('div', null, detail));
+    box.appendChild(line);
+  }
+}
+
+// --- actions ---
+async function sendMessage() {
+  const input = el('text');
+  const text = input.value.trim();
+  if (!text || !state.activeId) return;
+  const waId = state.thread.conversation.wa_id;
+  const button = el('send');
+  button.disabled = true;
+  try {
+    const res = await fetch('/api/messages/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: waId, text })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Send failed: ${data.error}${data.kind ? ` (${data.kind})` : ''}`);
+    } else {
+      input.value = '';
+      await openConversation(state.activeId);
+    }
+  } finally {
+    button.disabled = false;
+    input.focus();
+  }
+}
+
+async function post(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  return { ok: res.ok, data: await res.json().catch(() => ({})) };
+}
+
+el('send').addEventListener('click', sendMessage);
+el('text').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }
+});
+el('q').addEventListener('input', (event) => { state.search = event.target.value; loadConversations(); });
+el('filter').addEventListener('change', (event) => { state.filter = event.target.value; loadConversations(); });
+el('toggle-status').addEventListener('click', async () => {
+  const next = state.thread.conversation.status === 'open' ? 'closed' : 'open';
+  await post(`/api/conversations/${state.activeId}/status`, { status: next });
+  await openConversation(state.activeId);
+});
+el('sim-send').addEventListener('click', async () => {
+  const from = el('sim-from').value.trim();
+  const text = el('sim-text').value.trim();
+  const name = el('sim-name').value.trim();
+  if (!from || !text) return alert('Enter a number and a message.');
+  const { ok, data } = await post('/api/webhook/simulate', { from, text, name: name || undefined });
+  el('sim-hint').textContent = ok ? `Ingested: ${data.summary.messages} message(s), ${data.summary.statuses} status(es).` : data.error;
+  if (ok) { el('sim-text').value = ''; await refreshAll(); }
+});
+el('seed').addEventListener('click', async () => {
+  const { ok, data } = await post('/api/demo/seed');
+  el('sim-hint').textContent = ok ? `Seeded ${data.created.length} conversations${data.simulatedReplies ? ' with replies' : ' (no replies: live Meta mode)'}.` : data.error;
+  await refreshAll();
+});
+el('reset').addEventListener('click', async () => {
+  if (!confirm('Delete all stored contacts, conversations and messages?')) return;
+  await post('/api/demo/reset');
+  state.activeId = null; state.thread = null;
+  el('thread-head').style.display = 'none'; el('composer').style.display = 'none';
+  el('thread').textContent = ''; el('thread').appendChild(node('div', 'empty', 'Select a conversation to see messages.'));
+  await refreshAll();
+});
+
+// --- realtime ---
+let sseState = 'connecting';
+function connectStream() {
+  const stream = new EventSource('/api/stream');
+  stream.addEventListener('hello', () => { sseState = 'open'; refreshPills(); });
+  const refresh = (event) => {
+    loadConversations(); loadMetrics(); loadEvents();
+    if (state.activeId) {
+      const payload = JSON.parse(event.data || '{}');
+      const conv = payload.conversation;
+      if (!conv || conv.id === state.activeId) openConversation(state.activeId);
+    }
+  };
+  for (const type of ['message', 'status', 'conversation', 'event', 'reset']) {
+    stream.addEventListener(type, (event) => { loadEvents(); if (type !== 'event') refresh(event); else { loadMetrics(); loadConversations?.(); } });
+  }
+  stream.onerror = () => { sseState = 'down'; refreshPills(); };
+}
+
+async function refreshPills() {
+  const [health, config] = await Promise.all([
+    fetch('/api/health').then((r) => r.json()).catch(() => null),
+    fetch('/api/config').then((r) => r.json()).catch(() => null)
+  ]);
+  state.config = config;
+  renderPills(health, config);
+  el('sim-hint').textContent = config?.simulatorEnabled
+    ? 'Simulator active: inbound traffic is fabricated and outbound sends are stored locally.'
+    : 'Simulator disabled (live Meta credentials configured).';
+}
+
+async function refreshAll() { await Promise.all([loadConversations(), loadMetrics(), loadEvents(), refreshPills()]); }
+
+refreshAll().then(connectStream);
+setInterval(() => { loadMetrics(); if (state.thread) renderThread(); }, 30000);
+</script>
+</body>
+</html>
